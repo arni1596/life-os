@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+type Mode = "good" | "bad";
 type MasterItem = { name: string; done: boolean };
 type StepItem = { step: number; task: string; minutes: number };
 
@@ -13,25 +14,50 @@ type Plan = {
   };
 };
 
-const CURRENT_KEY = "lifeos_state_v2_current";
-const HISTORY_KEY = "lifeos_state_v2_history";
-
 type HistoryDay = {
-  date: string; // YYYY-MM-DD
-  mode: "good" | "bad";
+  date: string;
+  mode: Mode;
   daily_done: Record<string, boolean>;
   steps_done: Record<string, boolean>;
   last_generated_at?: string;
 };
 
 type SavedState = {
-  mode: "good" | "bad";
-  selected_date: string; // which day you are viewing
+  mode: Mode;
+  selected_date: string;
   daily_done: Record<string, boolean>;
   steps_done: Record<string, boolean>;
-  last_reset_date?: string; // YYYY-MM-DD
+  last_reset_date?: string;
   last_generated_at?: string;
 };
+
+const CURRENT_KEY = "lifeos_state_v2_current";
+const HISTORY_KEY = "lifeos_state_v2_history";
+const MASTER_TOTAL = 7;
+const DAILY_MASTER_ITEMS = [
+  "Sleep window",
+  "Move body",
+  "Daily reset",
+  "One focus block",
+  "Eat protein",
+  "No comparison",
+  "Save something ($1 counts)",
+];
+
+const modeCopy: Record<Mode, { label: string; description: string }> = {
+  good: {
+    label: "Good Day",
+    description: "For days when you can handle the full plan.",
+  },
+  bad: {
+    label: "Bad Day Minimum",
+    description: "For days when you only have enough energy for the basics.",
+  },
+};
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function defaultSavedState(): SavedState {
   const today = todayKey();
@@ -44,18 +70,22 @@ function defaultSavedState(): SavedState {
   };
 }
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function stepKey(mode: "good" | "bad", stepNumber: number) {
+function stepKey(mode: Mode, stepNumber: number) {
   return `${mode}:${stepNumber}`;
 }
 
 function addDays(dateKey: string, delta: number) {
-  const d = new Date(dateKey + "T00:00:00");
-  d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() + delta);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDate(dateKey: string) {
+  return new Intl.DateTimeFormat("en", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(`${dateKey}T00:00:00`));
 }
 
 function loadHistory(): Record<string, HistoryDay> {
@@ -72,27 +102,22 @@ function saveHistory(history: Record<string, HistoryDay>) {
   try {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   } catch {
-    // ignore
+    // Local storage can fail in private browsing or restricted browser settings.
   }
 }
 
-/* =========================
-   CSV EXPORT HELPERS (NEW)
-========================= */
-
 function monthPrefix(dateKey: string) {
-  // "2026-01-27" -> "2026-01"
   return dateKey.slice(0, 7);
 }
 
 function toCsvRow(values: (string | number)[]) {
   return values
-    .map((v) => {
-      const s = String(v ?? "");
-      if (s.includes(",") || s.includes('"') || s.includes("\n")) {
-        return `"${s.replaceAll('"', '""')}"`;
+    .map((value) => {
+      const cell = String(value ?? "");
+      if (cell.includes(",") || cell.includes('"') || cell.includes("\n")) {
+        return `"${cell.replaceAll('"', '""')}"`;
       }
-      return s;
+      return cell;
     })
     .join(",");
 }
@@ -100,24 +125,37 @@ function toCsvRow(values: (string | number)[]) {
 function downloadTextFile(filename: string, content: string, mime = "text/csv") {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
   URL.revokeObjectURL(url);
 }
 
+function countDone(record: Record<string, boolean>) {
+  return Object.values(record || {}).filter(Boolean).length;
+}
+
+function progressPercent(done: number, total: number) {
+  if (total <= 0) return 0;
+  return Math.round((done / total) * 100);
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Something went wrong";
+}
+
 export default function Home() {
+  const today = todayKey();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [saved, setSaved] = useState<SavedState>(defaultSavedState());
+  const [history, setHistory] = useState<Record<string, HistoryDay>>({});
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState("Ready when you are.");
 
-  const today = todayKey();
-
-  // Load current + auto-reset for "today"
   useEffect(() => {
     try {
       const raw = localStorage.getItem(CURRENT_KEY);
@@ -125,80 +163,60 @@ export default function Home() {
 
       if (!raw) {
         setSaved(base);
+        setHistory(loadHistory());
         return;
       }
 
       const parsed = JSON.parse(raw) as SavedState;
-
-      // Auto-reset only affects TODAY
       const needsResetToday = parsed.last_reset_date !== today;
-
       const next: SavedState = {
         ...base,
         ...parsed,
-        mode: parsed?.mode ?? "good",
-        selected_date: parsed?.selected_date ?? today,
+        mode: parsed.mode ?? "good",
+        selected_date: parsed.selected_date ?? today,
         last_reset_date: today,
-        daily_done: needsResetToday ? {} : (parsed.daily_done || {}),
-        steps_done: needsResetToday ? {} : (parsed.steps_done || {}),
+        daily_done: needsResetToday ? {} : parsed.daily_done || {},
+        steps_done: needsResetToday ? {} : parsed.steps_done || {},
       };
 
       setSaved(next);
-
-      // If reset happened and plan is visible, clear UI daily checkboxes
-      if (needsResetToday) {
-        setPlan((p) => {
-          if (!p) return p;
-          return {
-            ...p,
-            daily_master_7: p.daily_master_7.map((it) => ({ ...it, done: false })),
-          };
-        });
-      }
+      setHistory(loadHistory());
     } catch {
       setSaved(defaultSavedState());
+      setHistory(loadHistory());
     }
   }, [today]);
 
-  // Persist CURRENT state whenever it changes
   useEffect(() => {
     try {
       localStorage.setItem(CURRENT_KEY, JSON.stringify(saved));
     } catch {
-      // ignore
+      // Keep the UI usable even if localStorage is unavailable.
     }
   }, [saved]);
 
-  // Write TODAY snapshot into history when today's data changes
   useEffect(() => {
-    if (saved.selected_date !== today) return; // only snapshot today
-    const history = loadHistory();
-    history[today] = {
-      date: today,
-      mode: saved.mode,
-      daily_done: saved.daily_done,
-      steps_done: saved.steps_done,
-      last_generated_at: saved.last_generated_at,
-    };
-    saveHistory(history);
-  }, [
-    saved.daily_done,
-    saved.steps_done,
-    saved.mode,
-    saved.last_generated_at,
-    saved.selected_date,
-    today,
-  ]);
+    if (saved.selected_date !== today) return;
 
-  const history = useMemo(
-    () => loadHistory(),
-    [saved.daily_done, saved.steps_done, saved.mode, saved.last_generated_at, saved.selected_date, today]
-  );
+    const nextHistory = {
+      ...history,
+      [today]: {
+        date: today,
+        mode: saved.mode,
+        daily_done: saved.daily_done,
+        steps_done: saved.steps_done,
+        last_generated_at: saved.last_generated_at,
+      },
+    };
+
+    setHistory(nextHistory);
+    saveHistory(nextHistory);
+    // history is intentionally omitted to avoid rewriting the snapshot twice per toggle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved.daily_done, saved.steps_done, saved.mode, saved.last_generated_at, saved.selected_date, today]);
 
   const last7Dates = useMemo(() => {
-    const dates: string[] = [];
-    for (let i = 0; i < 7; i++) dates.push(addDays(today, -i));
-    return dates;
+    return Array.from({ length: 7 }, (_, index) => addDays(today, -index));
   }, [today]);
 
   const viewingToday = saved.selected_date === today;
@@ -216,15 +234,55 @@ export default function Home() {
     return history[saved.selected_date] ?? null;
   }, [history, saved, viewingToday, today]);
 
+  const activeMode = viewData?.mode ?? saved.mode;
+  const activeModePlan = plan
+    ? activeMode === "good"
+      ? plan.todays_plan.good_day
+      : plan.todays_plan.bad_day_minimum
+    : null;
+  const steps = activeModePlan?.steps ?? [];
+  const totalMinutes = activeModePlan?.total_minutes ?? 0;
+  const dailyCompletedCount = countDone(viewData?.daily_done ?? {});
+  const rawStepsCompletedCount = countDone(viewData?.steps_done ?? {});
+  const stepsCompletedCount = plan
+    ? steps.filter((step) => viewData?.steps_done?.[stepKey(activeMode, step.step)]).length
+    : rawStepsCompletedCount;
+  const dailyProgress = progressPercent(dailyCompletedCount, MASTER_TOTAL);
+  const stepProgress = progressPercent(stepsCompletedCount, steps.length);
+
+  const masterItems = plan?.daily_master_7 ?? DAILY_MASTER_ITEMS.map((name) => ({ name, done: false }));
+  const heroStatus = !viewingToday
+    ? "Viewing saved day"
+    : !plan
+      ? "No plan generated yet"
+      : dailyCompletedCount > 0 || stepsCompletedCount > 0
+        ? "Plan in progress"
+        : "Today is active";
+  const modeStatus = activeMode === "good" ? "Full plan selected." : "Basics-only plan selected.";
+  const planStatus = plan ? `${stepsCompletedCount} of ${steps.length} steps done.` : "Generate a plan to begin.";
+  const currentDay: HistoryDay = {
+    date: today,
+    mode: saved.mode,
+    daily_done: saved.daily_done,
+    steps_done: saved.steps_done,
+    last_generated_at: saved.last_generated_at,
+  };
+
   async function generate() {
+    if (!viewingToday) {
+      setFeedback("Return to today to generate a plan.");
+      return;
+    }
+
     setLoading(true);
     setError("");
+    setFeedback("Building today's plan.");
+
     try {
-      const resp = await fetch("/api/coach"); // GET
-      if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+      const response = await fetch("/api/coach");
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
 
-      const data = (await resp.json()) as Plan;
-
+      const data = (await response.json()) as Plan;
       const merged: Plan = {
         ...data,
         daily_master_7: data.daily_master_7.map((item) => ({
@@ -234,82 +292,88 @@ export default function Home() {
       };
 
       setPlan(merged);
-
-      if (viewingToday) {
-        setSaved((prev) => ({ ...prev, last_generated_at: new Date().toISOString() }));
-      }
-    } catch (e: any) {
-      setError(e?.message ?? "Something went wrong");
+      setSaved((prev) => ({ ...prev, last_generated_at: new Date().toISOString() }));
+      setFeedback("Saved to today.");
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+      setFeedback("Plan did not load. Try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  function setMode(mode: "good" | "bad") {
+  function setMode(mode: Mode) {
     if (!viewingToday) return;
     setSaved((prev) => ({ ...prev, mode }));
+    setFeedback(`${modeCopy[mode].label} selected. Progress saved.`);
   }
 
   function toggleDaily(name: string) {
     if (!viewingToday) return;
+
     setSaved((prev) => {
       const current = prev.daily_done[name] ?? false;
       const nextDailyDone = { ...prev.daily_done, [name]: !current };
 
-      setPlan((p) => {
-        if (!p) return p;
+      setPlan((currentPlan) => {
+        if (!currentPlan) return currentPlan;
         return {
-          ...p,
-          daily_master_7: p.daily_master_7.map((it) =>
-            it.name === name ? { ...it, done: !current } : it
+          ...currentPlan,
+          daily_master_7: currentPlan.daily_master_7.map((item) =>
+            item.name === name ? { ...item, done: !current } : item
           ),
         };
       });
 
+      setFeedback(!current ? "Marked done. That counts." : "Updated. Progress saved.");
       return { ...prev, daily_done: nextDailyDone };
     });
   }
 
-  function toggleStep(which: "good" | "bad", stepNumber: number) {
+  function toggleStep(mode: Mode, stepNumber: number) {
     if (!viewingToday) return;
-    const key = stepKey(which, stepNumber);
+
+    const key = stepKey(mode, stepNumber);
     setSaved((prev) => {
       const current = prev.steps_done[key] ?? false;
+      setFeedback(!current ? "Step complete. Progress saved." : "Updated. Progress saved.");
       return { ...prev, steps_done: { ...prev.steps_done, [key]: !current } };
     });
   }
 
   function resetForToday() {
     if (!viewingToday) return;
+
     setSaved((prev) => ({ ...prev, daily_done: {}, steps_done: {} }));
-    setPlan((p) => {
-      if (!p) return p;
+    setPlan((currentPlan) => {
+      if (!currentPlan) return currentPlan;
       return {
-        ...p,
-        daily_master_7: p.daily_master_7.map((it) => ({ ...it, done: false })),
+        ...currentPlan,
+        daily_master_7: currentPlan.daily_master_7.map((item) => ({ ...item, done: false })),
       };
     });
+    setFeedback("Reset today only. Saved history stays intact.");
   }
 
-  // ===== CSV EXPORT (NEW) =====
-  function downloadMonthCsv() {
-    const month = monthPrefix(today); // e.g., "2026-01"
-    const hist = loadHistory();
+  function selectDate(date: string) {
+    setSaved((prev) => ({ ...prev, selected_date: date }));
+    setFeedback(date === today ? "Today is editable." : "Viewing saved day.");
+  }
 
+  function downloadMonthCsv() {
+    const month = monthPrefix(today);
+    const storedHistory = loadHistory();
     const rows: string[] = [];
     rows.push(toCsvRow(["date", "mode", "daily_done_count", "steps_done_count", "generated_at"]));
 
-    // all stored history dates for current month
-    const monthDates = Object.keys(hist)
-      .filter((d) => d.startsWith(month))
+    const monthDates = Object.keys(storedHistory)
+      .filter((date) => date.startsWith(month))
       .sort();
-
-    // ensure today included even if not yet in history (rare, but safe)
     const dates = monthDates.includes(today) ? monthDates : [...monthDates, today].sort();
 
-    for (const d of dates) {
+    for (const date of dates) {
       const day: HistoryDay | undefined =
-        d === today
+        date === today
           ? {
               date: today,
               mode: saved.mode,
@@ -317,218 +381,267 @@ export default function Home() {
               steps_done: saved.steps_done,
               last_generated_at: saved.last_generated_at,
             }
-          : hist[d];
+          : storedHistory[date];
 
       if (!day) continue;
 
-      const dailyCount = Object.values(day.daily_done || {}).filter(Boolean).length;
-      const stepsCount = Object.values(day.steps_done || {}).filter(Boolean).length;
-      const generatedAt = day.last_generated_at ?? "";
-
-      rows.push(toCsvRow([d, day.mode, dailyCount, stepsCount, generatedAt]));
+      rows.push(
+        toCsvRow([
+          date,
+          day.mode,
+          countDone(day.daily_done),
+          countDone(day.steps_done),
+          day.last_generated_at ?? "",
+        ])
+      );
     }
 
-    const csv = rows.join("\n");
-    downloadTextFile(`life-os_${month}.csv`, csv, "text/csv");
+    downloadTextFile(`life-os_${month}.csv`, rows.join("\n"), "text/csv");
+    setFeedback("Month CSV downloaded.");
   }
-
-  const steps = useMemo(() => {
-    if (!plan) return [];
-    if (saved.mode === "good") return plan.todays_plan.good_day.steps;
-    return plan.todays_plan.bad_day_minimum.steps;
-  }, [plan, saved.mode]);
-
-  const totalMinutes = useMemo(() => {
-    if (!plan) return 0;
-    return saved.mode === "good"
-      ? plan.todays_plan.good_day.total_minutes
-      : plan.todays_plan.bad_day_minimum.total_minutes;
-  }, [plan, saved.mode]);
-
-  function selectDate(date: string) {
-    setSaved((prev) => ({ ...prev, selected_date: date }));
-  }
-
-  const yesterday = addDays(today, -1);
-
-  const dailyCompletedCount = useMemo(() => {
-    const d = viewData?.daily_done || {};
-    return Object.values(d).filter(Boolean).length;
-  }, [viewData]);
-
-  const stepsCompletedCount = useMemo(() => {
-    const s = viewData?.steps_done || {};
-    return Object.values(s).filter(Boolean).length;
-  }, [viewData]);
 
   return (
-    <main className="min-h-screen p-6 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold">Life OS</h1>
-      <p className="text-gray-600 mt-1">One button. One plan. No guessing.</p>
-
-      {/* History selector */}
-      <section className="mt-6 p-4 rounded border">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold">View:</span>
-
-          <button
-            onClick={() => selectDate(today)}
-            className={`px-3 py-2 rounded border ${saved.selected_date === today ? "bg-gray-200" : ""}`}
-          >
-            Today
-          </button>
-
-          <button
-            onClick={() => selectDate(yesterday)}
-            className={`px-3 py-2 rounded border ${saved.selected_date === yesterday ? "bg-gray-200" : ""}`}
-          >
-            Yesterday
-          </button>
-
-          <select
-            value={saved.selected_date}
-            onChange={(e) => selectDate(e.target.value)}
-            className="px-3 py-2 rounded border"
-            title="Last 7 days"
-          >
-            {last7Dates.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-
-          <span className="text-sm text-gray-600">
-            {viewingToday ? "(editable)" : "(read-only history)"}
-          </span>
+    <main className="life-shell">
+      <section className="hero-card">
+        <div className="hero-copy">
+          <p className="eyebrow">Daily execution dashboard</p>
+          <h1>Life OS</h1>
+          <p className="tagline">One button. One plan. No guessing.</p>
         </div>
-
-        <div className="mt-3 text-sm text-gray-700">
-          <div>
-            <b>Daily done:</b> {dailyCompletedCount}/7
-          </div>
-          <div>
-            <b>Steps done:</b> {stepsCompletedCount}
+        <div className="hero-panel" aria-label="Selected day">
+          <div className="status-pill">{heroStatus}</div>
+          <span>{viewingToday ? "Today" : "Viewing"}</span>
+          <strong>{formatDate(saved.selected_date)}</strong>
+          <small>Saved locally in this browser.</small>
+          <div className="hero-metrics">
+            <span>{dailyCompletedCount}/7 basics</span>
+            <span>{plan ? `${stepsCompletedCount}/${steps.length} steps` : "Plan not generated"}</span>
           </div>
         </div>
       </section>
 
-      <div className="mt-6 flex flex-wrap gap-3 items-center">
-        <button
-          onClick={generate}
-          disabled={loading}
-          className="px-4 py-2 rounded bg-black text-white disabled:opacity-60"
-        >
-          {loading ? "Generating..." : "Generate Today Plan"}
-        </button>
+      <section className="summary-grid" aria-label="Today summary">
+        <article className="summary-card">
+          <span>Current mode</span>
+          <strong>{modeCopy[activeMode].label}</strong>
+          <p>{modeStatus}</p>
+        </article>
+        <article className="summary-card">
+          <span>Daily Master 7</span>
+          <strong>
+            {dailyCompletedCount} of {MASTER_TOTAL}
+          </strong>
+          <p>{dailyCompletedCount} basics complete.</p>
+        </article>
+        <article className="summary-card">
+          <span>Plan steps</span>
+          <strong>
+            {stepsCompletedCount} of {plan ? steps.length : 0}
+          </strong>
+          <p>{planStatus}</p>
+        </article>
+      </section>
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode("good")}
-            className={`px-3 py-2 rounded border ${saved.mode === "good" ? "bg-gray-200" : ""}`}
-            disabled={!viewingToday}
-            title={viewingToday ? "Switch mode" : "History is read-only"}
-          >
-            Good Day
-          </button>
-          <button
-            onClick={() => setMode("bad")}
-            className={`px-3 py-2 rounded border ${saved.mode === "bad" ? "bg-gray-200" : ""}`}
-            disabled={!viewingToday}
-            title={viewingToday ? "Switch mode" : "History is read-only"}
-          >
-            Bad Day Minimum
-          </button>
+      <section className="panel history-panel" aria-label="Progress history">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Progress history</p>
+            <h2>Recent days</h2>
+          </div>
+          {!viewingToday && <p>Past days are read-only so your record stays accurate.</p>}
         </div>
 
-        <button
-          onClick={resetForToday}
-          className="px-3 py-2 rounded border"
-          title="Clears today’s checkboxes"
-          disabled={!viewingToday}
-        >
-          Reset checkboxes
-        </button>
+        <div className="day-chip-row" aria-label="Recent day progress">
+          {last7Dates.map((date) => {
+            const day = date === today ? currentDay : history[date];
+            const dayBasics = countDone(day?.daily_done ?? {});
+            const daySteps = countDone(day?.steps_done ?? {});
+            const selected = saved.selected_date === date;
 
-        <button
-          onClick={downloadMonthCsv}
-          className="px-3 py-2 rounded border"
-          title="Download this month as a CSV file"
-        >
-          Download Month CSV
-        </button>
+            return (
+              <button
+                key={date}
+                type="button"
+                onClick={() => selectDate(date)}
+                className={selected ? "day-chip selected" : "day-chip"}
+                aria-label={`${date}: ${dayBasics} basics complete, ${daySteps} steps complete`}
+              >
+                <span>{date === today ? "Today" : formatDate(date).slice(0, 3)}</span>
+                <strong>{date.slice(8)}</strong>
+                <i className={dayBasics + daySteps > 0 ? "dot filled" : "dot"} />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="history-controls">
+          <button
+            type="button"
+            onClick={() => selectDate(today)}
+            className={saved.selected_date === today ? "pill active" : "pill"}
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => selectDate(addDays(today, -1))}
+            className={saved.selected_date === addDays(today, -1) ? "pill active" : "pill"}
+          >
+            Yesterday
+          </button>
+          <label className="select-label">
+            <span>Saved days</span>
+            <select value={saved.selected_date} onChange={(event) => selectDate(event.target.value)}>
+              {last7Dates.map((date) => (
+                <option key={date} value={date}>
+                  {date}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <div className="main-grid">
+        <section className="panel plan-control-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Mode</p>
+              <h2>Pick the plan for today.</h2>
+            </div>
+          </div>
+
+          <div className="mode-grid" role="group" aria-label="Plan mode">
+            {(["good", "bad"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setMode(mode)}
+                disabled={!viewingToday}
+                className={activeMode === mode ? "mode-card selected" : "mode-card"}
+              >
+                <strong>{modeCopy[mode].label}</strong>
+                <span>{modeCopy[mode].description}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="action-row">
+            <button type="button" onClick={generate} disabled={loading || !viewingToday} className="primary-button">
+              {loading ? "Generating..." : "Generate today's plan"}
+            </button>
+            <button type="button" onClick={downloadMonthCsv} className="secondary-button">
+              Download month CSV
+            </button>
+          </div>
+
+          {error && <div className="error-box">{error}</div>}
+          <p className="feedback-line" aria-live="polite">
+            {feedback}
+          </p>
+        </section>
+
+        <section className="panel reset-panel">
+          <p className="eyebrow">Reset</p>
+          <h2>Reset today only</h2>
+          <p>Clears today&apos;s checkboxes. Your saved history stays intact.</p>
+          <button type="button" onClick={resetForToday} disabled={!viewingToday} className="secondary-button">
+            Reset today
+          </button>
+        </section>
       </div>
 
-      {error && (
-        <div className="mt-4 p-3 rounded border border-red-400 text-red-700 bg-red-50">
-          {error}
-        </div>
-      )}
+      <div className="content-grid">
+        <section className="panel foundation-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Foundation</p>
+              <h2>Daily Master 7</h2>
+            </div>
+            <p>Start with the basics.</p>
+          </div>
+          <p className="section-note">These are the pieces that keep the day steady.</p>
+          <ProgressBar value={dailyProgress} label={`${dailyCompletedCount} of ${MASTER_TOTAL} basics complete`} />
 
-      {!plan && (
-        <div className="mt-6 p-4 rounded border text-gray-700">
-          Click <b>Generate Today Plan</b> to load your plan. Then check items as you finish them.
-          Today auto-saves. History is read-only.
-        </div>
-      )}
-
-      {plan && viewData && (
-        <div className="mt-6 grid gap-6">
-          <section className="p-4 rounded border">
-            <h2 className="font-semibold text-lg">Daily Master 7</h2>
-            <ul className="mt-3 grid gap-2">
-              {plan.daily_master_7.map((item) => (
-                <li key={item.name} className="flex gap-2 items-center">
+          <ul className="check-list">
+            {masterItems.map((item) => {
+              const done = viewData?.daily_done[item.name] ?? false;
+              return (
+                <li key={item.name} className={done ? "check-row done" : "check-row"}>
                   <input
                     type="checkbox"
-                    checked={viewData.daily_done[item.name] ?? false}
+                    checked={done}
                     onChange={() => toggleDaily(item.name)}
                     disabled={!viewingToday}
+                    aria-label={item.name}
                   />
-                  <span className={(viewData.daily_done[item.name] ?? false) ? "line-through text-gray-500" : ""}>
-                    {item.name}
-                  </span>
+                  <span>{item.name}</span>
                 </li>
-              ))}
-            </ul>
-            <p className="text-xs text-gray-500 mt-3">
-              {viewingToday ? "Saved locally on this computer." : "History view (read-only)."}
-            </p>
-          </section>
+              );
+            })}
+          </ul>
+        </section>
 
-          <section className="p-4 rounded border">
-            <h2 className="font-semibold text-lg">
-              Today’s Plan ({saved.mode === "good" ? "Good Day" : "Bad Day Minimum"})
-            </h2>
-            <p className="text-gray-600 mt-1">Total: {totalMinutes} minutes</p>
+        <section className="panel today-plan-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Today</p>
+              <h2>Today&apos;s Plan</h2>
+            </div>
+            <p>{modeCopy[activeMode].label}</p>
+          </div>
 
-            <ul className="mt-3 grid gap-2">
-              {steps.map((s) => {
-                const key = stepKey(saved.mode, s.step);
-                const done = viewData.steps_done[key] ?? false;
-
-                return (
-                  <li key={key} className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={done}
-                      onChange={() => toggleStep(saved.mode, s.step)}
-                      disabled={!viewingToday}
-                    />
-                    <div>
-                      <div className={done ? "line-through text-gray-500" : "font-medium"}>
-                        {s.task}
+          {plan ? (
+            <>
+              <div className="plan-meta">
+                <span>Total: {totalMinutes} minutes</span>
+                <span>
+                  {stepsCompletedCount} of {steps.length} steps done
+                </span>
+              </div>
+              <ProgressBar value={stepProgress} label={`${stepProgress}% of plan steps complete`} />
+              <ol className="step-list">
+                {steps.map((step) => {
+                  const key = stepKey(activeMode, step.step);
+                  const done = viewData?.steps_done[key] ?? false;
+                  return (
+                    <li key={key} className={done ? "step-row done" : "step-row"}>
+                      <input
+                        type="checkbox"
+                        checked={done}
+                        onChange={() => toggleStep(activeMode, step.step)}
+                        disabled={!viewingToday}
+                        aria-label={`Step ${step.step}: ${step.task}`}
+                      />
+                      <div>
+                        <span className="step-number">Step {step.step}</span>
+                        <strong>{step.task}</strong>
+                        <small>{step.minutes} min</small>
                       </div>
-                      <div className="text-gray-600 text-sm">({s.minutes} min)</div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        </div>
-      )}
+                    </li>
+                  );
+                })}
+              </ol>
+            </>
+          ) : (
+            <div className="empty-state">No plan yet. Generate today&apos;s plan to start with the basics.</div>
+          )}
+        </section>
+      </div>
     </main>
+  );
+}
+
+function ProgressBar({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="progress-wrap" aria-label={label}>
+      <div className="progress-meta">
+        <span>{label}</span>
+        <strong>{value}%</strong>
+      </div>
+      <div className="progress-track">
+        <div className="progress-fill" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      </div>
+    </div>
   );
 }
