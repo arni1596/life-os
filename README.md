@@ -1,41 +1,100 @@
 # Life OS
 
-Life OS is a Next.js daily execution dashboard that turns a simple life blueprint into a Good Day or Bad Day Minimum plan, with local progress tracking, recent history, and CSV export.
+Life OS is a Next.js daily execution dashboard for building a Good Day plan, falling back to a Bad Day Minimum plan, tracking progress locally, and exporting monthly history.
 
-## What It Does
+## Product Overview
 
-Life OS helps the user open one page and know what to do today. It creates a simple daily plan, tracks the Daily Master 7 checklist, saves progress in the browser, keeps a short history, and exports monthly progress as a CSV file.
+Life OS is for the gap between having goals and actually knowing what to do today. It gives the user a simple plan, a smaller backup plan, and a visible record of what got done.
 
-The app is built around small daily proof. It keeps the focus on simple actions, recovery after hard days, and visible progress over time.
+This is not a journal app. It is not a reflection system, memory vault, or decision guide. Ishani OS handles that kind of private self-management work. Life OS is different: it is a daily execution dashboard for choosing the right level of effort, doing the basics, following through on plan steps, and keeping a local record.
+
+Some days need the full plan. Some days just need the minimum. Life OS makes both days count.
 
 ## Why I Built It
 
-I built Life OS to practice building a useful TypeScript and Next.js app around a real daily workflow. I wanted the app to support consistency without turning into a motivational quote board or a complicated productivity system.
+I built Life OS because I wanted a system that worked on normal days and hard days. A lot of planning tools assume every day starts with the same energy, but that is not realistic.
 
-The core idea is simple: a normal day gets a fuller plan, and a hard day still gets a minimum plan that counts.
+Life OS gives me a full plan when I can handle it and a smaller minimum plan when I cannot. The point is not perfection. The point is having a way to keep the day from disappearing completely.
+
+I also wanted to build a project that felt practical: a real dashboard with state, saved progress, history, reset behavior, and export logic instead of a static page.
 
 ## Current Features
 
-- Generate a daily plan from a local API route.
-- Switch between Good Day and Bad Day Minimum modes.
-- Track the Daily Master 7 checklist.
-- Check off plan steps with estimated minutes.
-- Save today's progress in `localStorage`.
-- Keep recent daily history.
-- View past days as read-only records.
-- Reset today's checkboxes without erasing saved history.
-- Export the current month as a CSV file.
-- Responsive layout for desktop and mobile.
+### Good Day Plan
+
+Good Day mode is for full-effort days. It gives the user a longer plan with estimated minutes for each step.
+
+### Bad Day Minimum Plan
+
+Bad Day Minimum mode is for low-energy days. It keeps the plan smaller so the user can still protect the basics and keep the day moving.
+
+### Daily Master 7 Checklist
+
+Daily Master 7 tracks the basic actions that anchor the day before anything more complicated gets added.
+
+### Local Progress Saving
+
+Life OS saves selected mode, checklist progress, plan step progress, selected date, and generated-plan state in `localStorage`.
+
+### Recent History View
+
+The dashboard includes a recent history view so the user can look back at saved days without needing an account or database.
+
+### Read-Only Past Days
+
+Past days are read-only so previous records stay accurate.
+
+### Reset Today Only
+
+The reset action clears today's checkboxes without deleting saved history.
+
+### Monthly CSV Export
+
+Life OS can export the current month's progress as a CSV file.
+
+### Plan Generation API Route
+
+The app includes a Next.js API route at `app/api/coach/route.ts` for generating the daily plan.
+
+## How It Works
+
+1. Choose Good Day or Bad Day Minimum.
+2. Generate today's plan.
+3. Check off Daily Master 7 basics.
+4. Complete plan steps.
+5. Review recent history.
+6. Export monthly progress as CSV.
+7. Reset today if needed without deleting history.
 
 ## Tech Stack
 
 - Next.js
 - React
 - TypeScript
-- Tailwind CSS
-- Local browser storage
+- CSS
+- `localStorage`
+- CSV export
 
-## How To Run Locally
+## Screenshots
+
+Screenshots are not included yet. Planned screenshots should be saved in `assets/screenshots/`.
+
+Planned screenshot set:
+
+- Dashboard
+- Good Day Plan
+- Bad Day Minimum
+- Progress History
+- Mobile View
+
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/arni1596/life-os.git
+cd life-os
+```
 
 Install dependencies:
 
@@ -43,59 +102,55 @@ Install dependencies:
 npm install
 ```
 
-Start the development server:
+Run the development server:
 
 ```bash
 npm run dev
 ```
 
-Open the app:
+Open the app in your browser:
 
 ```text
 http://localhost:3000
 ```
 
-Run linting:
-
-```bash
-npm run lint
-```
-
-Create a production build:
-
-```bash
-npm run build
-```
-
 ## Local Data Note
 
-Life OS stores progress in the browser with `localStorage`. It does not use a database, authentication, or a cloud account.
+Life OS stores progress in the browser using `localStorage`. It does not use a backend database or cloud storage.
 
-Progress is tied to the browser and device where the app is used. Clearing browser storage will clear saved progress.
+Saved progress belongs to the browser and device where the app is used. Clearing browser storage will clear saved Life OS progress.
 
-## Screenshots
+## What I Learned
 
-Add screenshots here before sharing the project publicly:
+This project helped me practice building a small but complete Next.js app around a real workflow.
 
-```markdown
-![Life OS dashboard](public/screenshots/life-os-dashboard.png)
-![Bad Day Minimum mode](public/screenshots/bad-day-minimum.png)
-![Progress history](public/screenshots/progress-history.png)
-```
+I worked on:
+
+- Building a Next.js app with TypeScript.
+- Managing local state.
+- Saving and loading progress with `localStorage`.
+- Creating read-only history views.
+- Exporting progress to CSV.
+- Designing clearer UX for different types of days.
+- Writing a README that explains the project clearly.
 
 ## Future Improvements
 
-- Add editable plan items.
-- Add a weekly summary view.
-- Add better long-term trend visuals.
-- Add import support for previously exported CSV files.
-- Add tests for local storage behavior and CSV export.
-- Add screenshot images for the README.
+- Editable blueprint.
+- Weekly summary.
+- Better mobile polish.
+- Optional charts.
+- Unit tests.
+- Accessibility review.
+- Screenshot documentation.
 
-## Resume-Ready Highlights
+## Technical Highlights
 
-- Built a TypeScript and Next.js daily execution dashboard with local progress tracking and read-only history views.
-- Implemented Good Day and Bad Day Minimum modes to support both normal execution and recovery-friendly planning.
-- Used `localStorage` to persist checklist state, plan progress, selected date, and monthly history without adding a database.
-- Added CSV export for monthly progress records.
-- Designed a calm, responsive interface focused on small daily actions and visible follow-through.
+- Built a Next.js and TypeScript daily dashboard with Good Day and Bad Day Minimum planning modes.
+- Implemented `localStorage` persistence for daily progress, recent history, and read-only past-day views.
+- Added monthly CSV export to turn daily progress into a downloadable record.
+- Designed recovery-friendly UX around reset behavior, progress summaries, and low-energy planning.
+
+## License
+
+License information can be added later.
