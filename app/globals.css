@@ -514,103 +514,155 @@ select {
   line-height: 1.55;
 }
 
+.blueprint-card,
 .blueprint-panel {
   margin-top: 18px;
   background: rgba(255, 250, 241, 0.9);
 }
 
-.blueprint-grid {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.95fr) repeat(2, minmax(0, 1.2fr));
-  gap: 14px;
+.blueprint-header {
+  align-items: center;
 }
 
-.blueprint-group {
+.saved-note {
+  width: fit-content;
+  padding: 8px 12px;
+  border: 1px solid rgba(37, 111, 92, 0.14);
+  border-radius: 999px;
+  background: rgba(220, 238, 231, 0.72);
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.blueprint-grid {
   display: grid;
-  gap: 12px;
+  grid-template-columns: minmax(240px, 0.85fr) repeat(2, minmax(0, 1.25fr));
+  gap: 16px;
+}
+
+.blueprint-section {
+  display: grid;
+  align-content: start;
+  gap: 14px;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 8px 24px rgba(31, 41, 51, 0.035);
 }
 
 .blueprint-group-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: baseline;
+  display: grid;
+  gap: 5px;
 }
 
 .blueprint-group-heading h3 {
   margin: 0;
-  font-size: 1rem;
+  color: var(--foreground);
+  font-size: 1.05rem;
 }
 
-.blueprint-group-heading span {
+.blueprint-group-heading p {
+  max-width: none;
+  margin: 0;
   color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .blueprint-list {
   display: grid;
-  gap: 9px;
+  gap: 10px;
 }
 
-.blueprint-field,
-.minutes-field {
+.blueprint-item {
   display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.blueprint-field {
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
 }
 
-.blueprint-field > span {
+.item-index {
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   place-items: center;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent-strong);
+  font-size: 0.86rem;
+  font-weight: 850;
 }
 
-.blueprint-field input,
-.minutes-field input {
+.blueprint-input,
+.step-title-input,
+.step-minutes-input {
   width: 100%;
-  min-height: 40px;
+  min-height: 42px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.86);
   color: var(--foreground);
   padding: 0 12px;
-  text-transform: none;
   letter-spacing: 0;
 }
 
-.blueprint-field input:focus,
-.minutes-field input:focus {
+.blueprint-input:focus,
+.step-title-input:focus,
+.step-minutes-input:focus {
   border-color: rgba(37, 111, 92, 0.45);
   outline: 3px solid rgba(37, 111, 92, 0.15);
 }
 
-.blueprint-step-row {
+.blueprint-step {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px;
-  gap: 8px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(31, 41, 51, 0.09);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
 }
 
-.minutes-field span {
-  padding-left: 2px;
+.step-index {
+  grid-column: 1 / -1;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.step-title-field,
+.step-minutes-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.minutes-input-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.minutes-input-wrap span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: lowercase;
+}
+
+.step-minutes-input {
+  min-width: 0;
+  padding-right: 6px;
 }
 
 .blueprint-actions {
@@ -619,10 +671,6 @@ select {
   gap: 10px;
   align-items: center;
   margin-top: 16px;
-}
-
-.blueprint-actions .feedback-line {
-  margin-left: auto;
 }
 
 .progress-wrap {
@@ -779,11 +827,7 @@ select {
     width: 100%;
   }
 
-  .blueprint-actions .feedback-line {
-    margin-left: 0;
-  }
-
-  .blueprint-step-row {
+  .blueprint-step {
     grid-template-columns: 1fr;
   }
 

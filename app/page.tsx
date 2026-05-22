@@ -713,93 +713,108 @@ export default function Home() {
         </section>
       </div>
 
-      <section className="panel blueprint-panel" aria-label="Daily Blueprint settings">
-        <div className="section-heading">
+      <section className="panel blueprint-panel blueprint-card" aria-label="Daily Blueprint settings">
+        <div className="section-heading blueprint-header">
           <div>
             <p className="eyebrow">Daily Blueprint</p>
             <h2>Customize your basics and plan steps.</h2>
           </div>
-          <p>Saved in this browser.</p>
+          <p className="saved-note" aria-live="polite">
+            {blueprintStatus}
+          </p>
         </div>
 
         <div className="blueprint-grid">
-          <div className="blueprint-group">
+          <div className="blueprint-section">
             <div className="blueprint-group-heading">
               <h3>Daily Master 7</h3>
-              <span>Basics</span>
+              <p>The basics that help the day feel manageable.</p>
             </div>
             <div className="blueprint-list">
               {blueprintDraft.dailyMaster.map((item, index) => (
-                <label key={`daily-${index}`} className="blueprint-field">
-                  <span>{index + 1}</span>
+                <div key={`daily-${index}`} className="blueprint-item">
+                  <span className="item-index">{index + 1}</span>
                   <input
+                    className="blueprint-input"
                     value={item}
                     onChange={(event) => updateDailyMaster(index, event.target.value)}
                     aria-label={`Daily Master ${index + 1}`}
                   />
-                </label>
+                </div>
               ))}
             </div>
           </div>
 
-          <div className="blueprint-group">
+          <div className="blueprint-section">
             <div className="blueprint-group-heading">
               <h3>Full plan</h3>
-              <span>Use when you can.</span>
+              <p>Use when you can handle the full plan.</p>
             </div>
             <div className="blueprint-list">
               {blueprintDraft.goodDaySteps.map((step, index) => (
-                <div key={`good-${index}`} className="blueprint-step-row">
-                  <label className="blueprint-field">
-                    <span>{index + 1}</span>
+                <div key={`good-${index}`} className="blueprint-step">
+                  <span className="step-index">Step {index + 1}</span>
+                  <label className="step-title-field">
+                    <span>Title</span>
                     <input
+                      className="step-title-input"
                       value={step.title}
                       onChange={(event) => updateBlueprintStep("good", index, "title", event.target.value)}
                       aria-label={`Good Day step ${index + 1}`}
                     />
                   </label>
-                  <label className="minutes-field">
-                    <span>Min</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="480"
-                      value={step.minutes}
-                      onChange={(event) => updateBlueprintStep("good", index, "minutes", event.target.value)}
-                      aria-label={`Good Day step ${index + 1} minutes`}
-                    />
+                  <label className="step-minutes-field">
+                    <span>Minutes</span>
+                    <div className="minutes-input-wrap">
+                      <input
+                        className="step-minutes-input"
+                        type="number"
+                        min="0"
+                        max="480"
+                        value={step.minutes}
+                        onChange={(event) => updateBlueprintStep("good", index, "minutes", event.target.value)}
+                        aria-label={`Good Day step ${index + 1} minutes`}
+                      />
+                      <span>min</span>
+                    </div>
                   </label>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="blueprint-group">
+          <div className="blueprint-section">
             <div className="blueprint-group-heading">
               <h3>Minimum plan</h3>
-              <span>Use when you need the basics.</span>
+              <p>Use when you only have enough energy for the basics.</p>
             </div>
             <div className="blueprint-list">
               {blueprintDraft.badDayMinimumSteps.map((step, index) => (
-                <div key={`bad-${index}`} className="blueprint-step-row">
-                  <label className="blueprint-field">
-                    <span>{index + 1}</span>
+                <div key={`bad-${index}`} className="blueprint-step">
+                  <span className="step-index">Step {index + 1}</span>
+                  <label className="step-title-field">
+                    <span>Title</span>
                     <input
+                      className="step-title-input"
                       value={step.title}
                       onChange={(event) => updateBlueprintStep("bad", index, "title", event.target.value)}
                       aria-label={`Bad Day Minimum step ${index + 1}`}
                     />
                   </label>
-                  <label className="minutes-field">
-                    <span>Min</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="480"
-                      value={step.minutes}
-                      onChange={(event) => updateBlueprintStep("bad", index, "minutes", event.target.value)}
-                      aria-label={`Bad Day Minimum step ${index + 1} minutes`}
-                    />
+                  <label className="step-minutes-field">
+                    <span>Minutes</span>
+                    <div className="minutes-input-wrap">
+                      <input
+                        className="step-minutes-input"
+                        type="number"
+                        min="0"
+                        max="480"
+                        value={step.minutes}
+                        onChange={(event) => updateBlueprintStep("bad", index, "minutes", event.target.value)}
+                        aria-label={`Bad Day Minimum step ${index + 1} minutes`}
+                      />
+                      <span>min</span>
+                    </div>
                   </label>
                 </div>
               ))}
@@ -814,9 +829,6 @@ export default function Home() {
           <button type="button" onClick={resetBlueprintToDefaults} className="secondary-button">
             Reset to defaults
           </button>
-          <p className="feedback-line" aria-live="polite">
-            {blueprintStatus}
-          </p>
         </div>
       </section>
     </main>
