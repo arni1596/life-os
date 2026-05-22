@@ -116,9 +116,9 @@ http://localhost:3000
 
 ## Local Data Note
 
-Life OS stores progress in the browser using `localStorage`. It does not use a backend database or cloud storage.
+Life OS saves progress in the browser using `localStorage`. It does not use a backend database or cloud storage.
 
-Saved progress belongs to the browser and device where the app is used. Clearing browser storage will clear saved Life OS progress.
+That means progress stays on the browser and device where the app is used. If browser storage is cleared, saved Life OS progress will be cleared too.
 
 ## What I Learned
 
