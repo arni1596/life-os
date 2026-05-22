@@ -1,12 +1,14 @@
 # Life OS
 
-Life OS is a Next.js daily execution dashboard for building a Good Day plan, falling back to a Bad Day Minimum plan, tracking progress locally, and exporting monthly history.
+Life OS is a Next.js daily execution dashboard for building a customizable Good Day plan, falling back to a Bad Day Minimum plan, tracking progress locally, and exporting monthly history.
 
 ## Product Overview
 
 Life OS is for the gap between having goals and actually knowing what to do today. It gives the user a simple plan, a smaller backup plan, and a visible record of what got done.
 
 This is not a journal app. It is not a reflection system, memory vault, or decision guide. Ishani OS handles that kind of private self-management work. Life OS is different: it is a daily execution dashboard for choosing the right level of effort, doing the basics, following through on plan steps, and keeping a local record.
+
+Life OS starts with a simple default blueprint, but users can edit the Daily Master 7 and plan steps so the system fits their own life instead of being locked to one routine.
 
 Some days need the full plan. Some days just need the minimum. Life OS makes both days count.
 
@@ -20,13 +22,17 @@ I also wanted to build a project that felt practical: a real dashboard with stat
 
 ## Current Features
 
+### Customizable Daily Blueprint
+
+Daily Blueprint lets the user edit the Daily Master 7 checklist, Good Day plan steps, Bad Day Minimum plan steps, and estimated minutes. The custom blueprint is saved in `localStorage`.
+
 ### Good Day Plan
 
-Good Day mode is for full-effort days. It gives the user a longer plan with estimated minutes for each step.
+Good Day mode is for full-effort days. It uses the saved blueprint to generate a longer plan with estimated minutes for each step.
 
 ### Bad Day Minimum Plan
 
-Bad Day Minimum mode is for low-energy days. It keeps the plan smaller so the user can still protect the basics and keep the day moving.
+Bad Day Minimum mode is for low-energy days. It uses the saved blueprint to keep the plan smaller so the user can still protect the basics and keep the day moving.
 
 ### Daily Master 7 Checklist
 
@@ -34,7 +40,7 @@ Daily Master 7 tracks the basic actions that anchor the day before anything more
 
 ### Local Progress Saving
 
-Life OS saves selected mode, checklist progress, plan step progress, selected date, and generated-plan state in `localStorage`.
+Life OS saves the custom blueprint, selected mode, checklist progress, plan step progress, selected date, and generated-plan state in `localStorage`.
 
 ### Recent History View
 
@@ -59,12 +65,13 @@ The app includes a Next.js API route at `app/api/coach/route.ts` for generating 
 ## How It Works
 
 1. Choose Good Day or Bad Day Minimum.
-2. Generate today's plan.
-3. Check off Daily Master 7 basics.
-4. Complete plan steps.
-5. Review recent history.
-6. Export monthly progress as CSV.
-7. Reset today if needed without deleting history.
+2. Customize the Daily Blueprint if the default basics or plan steps do not fit.
+3. Generate today's plan.
+4. Check off Daily Master 7 basics.
+5. Complete plan steps.
+6. Review recent history.
+7. Export monthly progress as CSV.
+8. Reset today if needed without deleting history.
 
 ## Tech Stack
 
@@ -129,6 +136,7 @@ I worked on:
 - Building a Next.js app with TypeScript.
 - Managing local state.
 - Saving and loading progress with `localStorage`.
+- Building a customizable local blueprint system.
 - Creating read-only history views.
 - Exporting progress to CSV.
 - Designing clearer UX for different types of days.
@@ -136,7 +144,7 @@ I worked on:
 
 ## Future Improvements
 
-- Editable blueprint.
+- Blueprint templates for different seasons or routines.
 - Weekly summary.
 - Better mobile polish.
 - Optional charts.
@@ -147,6 +155,7 @@ I worked on:
 ## Technical Highlights
 
 - Built a Next.js and TypeScript daily dashboard with Good Day and Bad Day Minimum planning modes.
+- Built a customizable local blueprint system with TypeScript state and `localStorage` so users can edit daily checklist items and plan steps without needing a backend database.
 - Implemented `localStorage` persistence for daily progress, recent history, and read-only past-day views.
 - Added monthly CSV export to turn daily progress into a downloadable record.
 - Designed recovery-friendly UX around reset behavior, progress summaries, and low-energy planning.

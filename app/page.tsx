@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  buildPlanFromBlueprint,
+  defaultBlueprint,
+  sanitizeBlueprint,
+  type Blueprint,
+  type BlueprintStep,
+  type GeneratedPlan,
+  type PlanMode,
+} from "../lib/blueprint";
 
-type Mode = "good" | "bad";
-type MasterItem = { name: string; done: boolean };
-type StepItem = { step: number; task: string; minutes: number };
-
-type Plan = {
-  daily_master_7: MasterItem[];
-  todays_plan: {
-    good_day: { total_minutes: number; steps: StepItem[] };
-    bad_day_minimum: { total_minutes: number; steps: StepItem[] };
-  };
-};
+type Mode = PlanMode;
+type Plan = GeneratedPlan;
 
 type HistoryDay = {
   date: string;
@@ -33,16 +33,7 @@ type SavedState = {
 
 const CURRENT_KEY = "lifeos_state_v2_current";
 const HISTORY_KEY = "lifeos_state_v2_history";
-const MASTER_TOTAL = 7;
-const DAILY_MASTER_ITEMS = [
-  "Sleep window",
-  "Move body",
-  "Daily reset",
-  "One focus block",
-  "Eat protein",
-  "No comparison",
-  "Save something ($1 counts)",
-];
+const BLUEPRINT_KEY = "lifeos_state_v1_blueprint";
 
 const modeCopy: Record<Mode, { label: string; description: string }> = {
   good: {
@@ -106,6 +97,24 @@ function saveHistory(history: Record<string, HistoryDay>) {
   }
 }
 
+function loadBlueprintFromStorage() {
+  try {
+    const raw = localStorage.getItem(BLUEPRINT_KEY);
+    if (!raw) return sanitizeBlueprint(defaultBlueprint);
+    return sanitizeBlueprint(JSON.parse(raw));
+  } catch {
+    return sanitizeBlueprint(defaultBlueprint);
+  }
+}
+
+function saveBlueprintToStorage(blueprint: Blueprint) {
+  try {
+    localStorage.setItem(BLUEPRINT_KEY, JSON.stringify(sanitizeBlueprint(blueprint)));
+  } catch {
+    // The dashboard still works with defaults if localStorage is unavailable.
+  }
+}
+
 function monthPrefix(dateKey: string) {
   return dateKey.slice(0, 7);
 }
@@ -138,6 +147,10 @@ function countDone(record: Record<string, boolean>) {
   return Object.values(record || {}).filter(Boolean).length;
 }
 
+function countBlueprintDone(record: Record<string, boolean>, items: string[]) {
+  return items.filter((item) => record[item]).length;
+}
+
 function progressPercent(done: number, total: number) {
   if (total <= 0) return 0;
   return Math.round((done / total) * 100);
@@ -152,14 +165,21 @@ export default function Home() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [saved, setSaved] = useState<SavedState>(defaultSavedState());
   const [history, setHistory] = useState<Record<string, HistoryDay>>({});
+  const [blueprint, setBlueprint] = useState<Blueprint>(() => sanitizeBlueprint(defaultBlueprint));
+  const [blueprintDraft, setBlueprintDraft] = useState<Blueprint>(() => sanitizeBlueprint(defaultBlueprint));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("Ready when you are.");
+  const [blueprintStatus, setBlueprintStatus] = useState("Saved in this browser.");
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(CURRENT_KEY);
       const base = defaultSavedState();
+      const storedBlueprint = loadBlueprintFromStorage();
+
+      setBlueprint(storedBlueprint);
+      setBlueprintDraft(storedBlueprint);
 
       if (!raw) {
         setSaved(base);
@@ -242,15 +262,18 @@ export default function Home() {
     : null;
   const steps = activeModePlan?.steps ?? [];
   const totalMinutes = activeModePlan?.total_minutes ?? 0;
-  const dailyCompletedCount = countDone(viewData?.daily_done ?? {});
+  const masterTotal = blueprint.dailyMaster.length;
+  const dailyCompletedCount = viewingToday
+    ? countBlueprintDone(viewData?.daily_done ?? {}, blueprint.dailyMaster)
+    : countDone(viewData?.daily_done ?? {});
   const rawStepsCompletedCount = countDone(viewData?.steps_done ?? {});
   const stepsCompletedCount = plan
     ? steps.filter((step) => viewData?.steps_done?.[stepKey(activeMode, step.step)]).length
     : rawStepsCompletedCount;
-  const dailyProgress = progressPercent(dailyCompletedCount, MASTER_TOTAL);
+  const dailyProgress = progressPercent(Math.min(dailyCompletedCount, masterTotal), masterTotal);
   const stepProgress = progressPercent(stepsCompletedCount, steps.length);
 
-  const masterItems = plan?.daily_master_7 ?? DAILY_MASTER_ITEMS.map((name) => ({ name, done: false }));
+  const masterItems = blueprint.dailyMaster.map((name) => ({ name, done: viewData?.daily_done?.[name] ?? false }));
   const heroStatus = !viewingToday
     ? "Viewing saved day"
     : !plan
@@ -279,7 +302,11 @@ export default function Home() {
     setFeedback("Building today's plan.");
 
     try {
-      const response = await fetch("/api/coach");
+      const response = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blueprint }),
+      });
       if (!response.ok) throw new Error(`API error: ${response.status}`);
 
       const data = (await response.json()) as Plan;
@@ -360,6 +387,63 @@ export default function Home() {
     setFeedback(date === today ? "Today is editable." : "Viewing saved day.");
   }
 
+  function refreshPlanFromBlueprint(nextBlueprint: Blueprint) {
+    setPlan((currentPlan) => {
+      if (!currentPlan) return currentPlan;
+
+      const nextPlan = buildPlanFromBlueprint(nextBlueprint);
+      return {
+        ...nextPlan,
+        daily_master_7: nextPlan.daily_master_7.map((item) => ({
+          ...item,
+          done: saved.daily_done[item.name] ?? false,
+        })),
+      };
+    });
+  }
+
+  function updateDailyMaster(index: number, value: string) {
+    setBlueprintDraft((current) => ({
+      ...current,
+      dailyMaster: current.dailyMaster.map((item, itemIndex) => (itemIndex === index ? value : item)),
+    }));
+    setBlueprintStatus("Unsaved changes.");
+  }
+
+  function updateBlueprintStep(mode: Mode, index: number, field: keyof BlueprintStep, value: string) {
+    const key = mode === "good" ? "goodDaySteps" : "badDayMinimumSteps";
+
+    setBlueprintDraft((current) => ({
+      ...current,
+      [key]: current[key].map((step, stepIndex) => {
+        if (stepIndex !== index) return step;
+        return {
+          ...step,
+          [field]: field === "minutes" ? Number(value) : value,
+        };
+      }),
+    }));
+    setBlueprintStatus("Unsaved changes.");
+  }
+
+  function saveBlueprint() {
+    const nextBlueprint = sanitizeBlueprint(blueprintDraft);
+    setBlueprint(nextBlueprint);
+    setBlueprintDraft(nextBlueprint);
+    saveBlueprintToStorage(nextBlueprint);
+    refreshPlanFromBlueprint(nextBlueprint);
+    setBlueprintStatus("Blueprint saved. Saved in this browser.");
+  }
+
+  function resetBlueprintToDefaults() {
+    const nextBlueprint = sanitizeBlueprint(defaultBlueprint);
+    setBlueprint(nextBlueprint);
+    setBlueprintDraft(nextBlueprint);
+    saveBlueprintToStorage(nextBlueprint);
+    refreshPlanFromBlueprint(nextBlueprint);
+    setBlueprintStatus("Defaults restored. Saved in this browser.");
+  }
+
   function downloadMonthCsv() {
     const month = monthPrefix(today);
     const storedHistory = loadHistory();
@@ -429,7 +513,7 @@ export default function Home() {
         <article className="summary-card">
           <span>Daily Master 7</span>
           <strong>
-            {dailyCompletedCount} of {MASTER_TOTAL}
+            {dailyCompletedCount} of {masterTotal}
           </strong>
           <p>{dailyCompletedCount} basics complete.</p>
         </article>
@@ -561,7 +645,7 @@ export default function Home() {
             <p>Start with the basics.</p>
           </div>
           <p className="section-note">These are the pieces that keep the day steady.</p>
-          <ProgressBar value={dailyProgress} label={`${dailyCompletedCount} of ${MASTER_TOTAL} basics complete`} />
+          <ProgressBar value={dailyProgress} label={`${dailyCompletedCount} of ${masterTotal} basics complete`} />
 
           <ul className="check-list">
             {masterItems.map((item) => {
@@ -628,6 +712,113 @@ export default function Home() {
           )}
         </section>
       </div>
+
+      <section className="panel blueprint-panel" aria-label="Daily Blueprint settings">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Daily Blueprint</p>
+            <h2>Customize your basics and plan steps.</h2>
+          </div>
+          <p>Saved in this browser.</p>
+        </div>
+
+        <div className="blueprint-grid">
+          <div className="blueprint-group">
+            <div className="blueprint-group-heading">
+              <h3>Daily Master 7</h3>
+              <span>Basics</span>
+            </div>
+            <div className="blueprint-list">
+              {blueprintDraft.dailyMaster.map((item, index) => (
+                <label key={`daily-${index}`} className="blueprint-field">
+                  <span>{index + 1}</span>
+                  <input
+                    value={item}
+                    onChange={(event) => updateDailyMaster(index, event.target.value)}
+                    aria-label={`Daily Master ${index + 1}`}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="blueprint-group">
+            <div className="blueprint-group-heading">
+              <h3>Full plan</h3>
+              <span>Use when you can.</span>
+            </div>
+            <div className="blueprint-list">
+              {blueprintDraft.goodDaySteps.map((step, index) => (
+                <div key={`good-${index}`} className="blueprint-step-row">
+                  <label className="blueprint-field">
+                    <span>{index + 1}</span>
+                    <input
+                      value={step.title}
+                      onChange={(event) => updateBlueprintStep("good", index, "title", event.target.value)}
+                      aria-label={`Good Day step ${index + 1}`}
+                    />
+                  </label>
+                  <label className="minutes-field">
+                    <span>Min</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="480"
+                      value={step.minutes}
+                      onChange={(event) => updateBlueprintStep("good", index, "minutes", event.target.value)}
+                      aria-label={`Good Day step ${index + 1} minutes`}
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="blueprint-group">
+            <div className="blueprint-group-heading">
+              <h3>Minimum plan</h3>
+              <span>Use when you need the basics.</span>
+            </div>
+            <div className="blueprint-list">
+              {blueprintDraft.badDayMinimumSteps.map((step, index) => (
+                <div key={`bad-${index}`} className="blueprint-step-row">
+                  <label className="blueprint-field">
+                    <span>{index + 1}</span>
+                    <input
+                      value={step.title}
+                      onChange={(event) => updateBlueprintStep("bad", index, "title", event.target.value)}
+                      aria-label={`Bad Day Minimum step ${index + 1}`}
+                    />
+                  </label>
+                  <label className="minutes-field">
+                    <span>Min</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="480"
+                      value={step.minutes}
+                      onChange={(event) => updateBlueprintStep("bad", index, "minutes", event.target.value)}
+                      aria-label={`Bad Day Minimum step ${index + 1} minutes`}
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="blueprint-actions">
+          <button type="button" onClick={saveBlueprint} className="primary-button">
+            Save blueprint
+          </button>
+          <button type="button" onClick={resetBlueprintToDefaults} className="secondary-button">
+            Reset to defaults
+          </button>
+          <p className="feedback-line" aria-live="polite">
+            {blueprintStatus}
+          </p>
+        </div>
+      </section>
     </main>
   );
 }

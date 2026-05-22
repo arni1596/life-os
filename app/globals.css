@@ -514,6 +514,117 @@ select {
   line-height: 1.55;
 }
 
+.blueprint-panel {
+  margin-top: 18px;
+  background: rgba(255, 250, 241, 0.9);
+}
+
+.blueprint-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.95fr) repeat(2, minmax(0, 1.2fr));
+  gap: 14px;
+}
+
+.blueprint-group {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.blueprint-group-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.blueprint-group-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.blueprint-group-heading span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.blueprint-list {
+  display: grid;
+  gap: 9px;
+}
+
+.blueprint-field,
+.minutes-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.blueprint-field {
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+}
+
+.blueprint-field > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.blueprint-field input,
+.minutes-field input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--foreground);
+  padding: 0 12px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.blueprint-field input:focus,
+.minutes-field input:focus {
+  border-color: rgba(37, 111, 92, 0.45);
+  outline: 3px solid rgba(37, 111, 92, 0.15);
+}
+
+.blueprint-step-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 86px;
+  gap: 8px;
+  align-items: end;
+}
+
+.minutes-field span {
+  padding-left: 2px;
+}
+
+.blueprint-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.blueprint-actions .feedback-line {
+  margin-left: auto;
+}
+
 .progress-wrap {
   display: grid;
   gap: 8px;
@@ -611,7 +722,8 @@ select {
   .summary-grid,
   .main-grid,
   .content-grid,
-  .mode-grid {
+  .mode-grid,
+  .blueprint-grid {
     grid-template-columns: 1fr;
   }
 
@@ -654,15 +766,25 @@ select {
   }
 
   .history-controls,
-  .action-row {
+  .action-row,
+  .blueprint-actions {
     align-items: stretch;
   }
 
   .history-controls > *,
   .action-row > *,
+  .blueprint-actions > *,
   .select-label,
   select {
     width: 100%;
+  }
+
+  .blueprint-actions .feedback-line {
+    margin-left: 0;
+  }
+
+  .blueprint-step-row {
+    grid-template-columns: 1fr;
   }
 
   .select-label {
