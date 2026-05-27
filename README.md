@@ -84,15 +84,23 @@ The app includes a Next.js API route at `app/api/coach/route.ts` for generating 
 
 ## Screenshots
 
-Screenshots are not included yet. Planned screenshots should be saved in `assets/screenshots/`.
+### Dashboard
+![Life OS dashboard](assets/screenshots/life-os-dashboard.png)
 
-Planned screenshot set:
+### Daily Blueprint
+![Daily Blueprint customization](assets/screenshots/daily-blueprint.png)
 
-- Dashboard
-- Good Day Plan
-- Bad Day Minimum
-- Progress History
-- Mobile View
+### Good Day Plan
+![Good Day plan](assets/screenshots/good-day-plan.png)
+
+### Bad Day Minimum
+![Bad Day Minimum plan](assets/screenshots/bad-day-minimum.png)
+
+### Progress History
+![Progress history](assets/screenshots/progress-history.png)
+
+### Mobile View
+![Mobile view](assets/screenshots/mobile-view.png)
 
 ## Installation
 
